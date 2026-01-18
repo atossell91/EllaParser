@@ -67,56 +67,102 @@ class MyHTMLParser(HTMLParser):
         if not data.isspace():
             self.current_elem().text = data
 
-def make_js(root_nodes):
-    out_strings = []
-    func_index = 0
-    for root_node in root_nodes:
-        ticker = TickerCounter(start=0, increment=1)
-        strings = [
-            f"function f{func_index}(){{",
-            "const m = new Map();",
-            "const e=[];"
+class JsBuilder:
+    def __init__(self, name):
+        self.root = None
+        self.statements = []
+        self.index_counter = TickerCounter(0, 1)
+        self.component_name = name
+        self.elems_arr_name = 'e'
+        self.id_tag_name = 'data-name'
+        self.id_tag_prefix = "id-"
+        self.map_name = "map"
+        self.initial_statements = [
+            f'function {self.component_name}(){{',
+            f'const {self.elems_arr_name}=[];',
+            f'const {self.map_name}=new Map();'
         ]
-        elems = process_node(root_node, ticker)
-        for elem in elems:
-            strings.append(elem)
-        strings.extend([
-            "return {rootElem:e[0],refs:m}}",
-            "export{f0}"
-            "\n"
-        ])
-        out_strings.append(strings)
-    
-    return out_strings
+        self.final_statements = [
+            f'return{{elems:{self.elems_arr_name}[0],refs:{self.map_name}}}}}',
+            f'export{{{self.component_name}}}'
+        ]
+        self.pretty_indent = "    "
 
-def process_node(html_node, ticker, parent_index=None):
-    lines = []
-    print(html_node)
-    lines.append(f'e.push(document.createElement("{html_node.tag_name}"));')
-    elem_index = ticker.get_current_num()
-    if parent_index is None:
-        root_index = 0
-    else:
-        lines.append(f'e[{parent_index}].appendChild(e[{elem_index}]);')
-        root_index = parent_index +1
-    
-    if html_node.text:
-        lines.append(f'e[{elem_index}].innerText="{html_node.text}";')
+    def is_id_attribute(self, name, value):
+        return name == self.id_tag_name and value[0:len(self.id_tag_prefix)] == self.id_tag_prefix
 
-    for attribute in html_node.attributes:
-        if attribute[0] == "data-name" and attribute[1][0:3] == "id-":
-            name = attribute[1][3:]
-            lines.append(f'm.set("{name}",e[{elem_index}]);')
-            #lines.append(f'e[{elem_index}].setAttribute("{attribute[0]}","{name}");')
-        else:
-            lines.append(f'e[{elem_index}].setAttribute("{attribute[0]}","{attribute[1]}");')
+    def apply_attributes(self, elem_index, attributes):
+        for attribute in attributes:
+            name = attribute[0]
+            value = attribute[1]
 
-    for child in html_node.children:
-        ticker.increment_ticker()
-        res_nodes = process_node(child, ticker, root_index)
-        lines.extend(res_nodes)
+            if self.is_id_attribute(name, value):
+                key = value[len(self.id_tag_prefix):]
+                statement = f'{self.map_name}.set("{key}",{self.elems_arr_name}[{elem_index}]);'
+                self.statements.append(statement)
+            else:
+                statement = f'{self.elems_arr_name}[{elem_index}].setAttribute("{name}","{value}");'
+                self.statements.append(statement)
     
-    return lines
+    def apply_data(self, elem_index, data):
+        statement = f'{self.elems_arr_name}[{elem_index}].innerText="{data}";'
+        self.statements.append(statement)
+
+    def create_element(self, tag):
+        self.statements.append(f'{self.elems_arr_name}.push(document.createElement("{tag}"));')
+        self.index_counter.increment_ticker()
+
+    def append_element(self, parent_index, child_index):
+        parent = f'{self.elems_arr_name}[{parent_index}]'
+        child = f'{self.elems_arr_name}[{child_index}]'
+        statement = f'{parent}.appendChild({child});'
+        self.statements.append(statement)
+
+    def start_walk(self, tree):
+        self.create_element(tree.tag_name)
+        current_index = self.index_counter.get_current_num()-1
+        self.apply_attributes(current_index, tree.attributes)
+        if len(tree.text) > 0:
+            self.apply_data(current_index, tree.text)
+        for child in tree.children:
+            self.walk(child, current_index)
+
+    def walk(self, tree, parent_index):
+        current_index = self.index_counter.get_current_num() #must come before create_element!!
+        self.create_element(tree.tag_name)
+        self.apply_attributes(current_index, tree.attributes)
+        if len(tree.text) > 0:
+            self.apply_data(current_index, tree.text)
+        self.append_element(parent_index, current_index)
+
+        for child in tree.children:
+            self.walk(child, current_index)
+
+    def get_pretty_str(self):
+        output = ''
+        for statement in self.initial_statements:
+            output = output + statement + '\n'
+
+        for statement in self.statements:
+            output = output + self.pretty_indent + statement + '\n'
+
+        for statement in self.final_statements:
+            output = output + statement + '\n'
+        
+        return output
+
+    def get_ugly_str(self):
+        output = ''
+        for statement in self.initial_statements:
+            output = output + statement
+
+        for statement in self.statements:
+            output = output + statement
+
+        for statement in self.final_statements:
+            output = output + statement
+        
+        return output
 
 def tree_from_html(html):
     parser = MyHTMLParser()
@@ -132,8 +178,9 @@ def process(file_path, output_dir):
         html = file.read(-1)
     tree = tree_from_html(html)
 
-    res = make_js(tree)
-    output = ''.join(res[0])
+    builder = JsBuilder(name)
+    builder.start_walk(tree[0])
+    output = builder.get_ugly_str()
 
     outpath = path.join(output_dir, f'{name}.js')
     with open(outpath, 'w') as file:
