@@ -1,6 +1,6 @@
-from html.parser import HTMLParser
 from os import path
 import json
+from HtmlToTree import HtmlNode, HtmlToTree
 
 class TickerCounter:
     def __init__(self, start=0, increment = 1):
@@ -12,60 +12,6 @@ class TickerCounter:
 
     def increment_ticker(self):
         self.current_num = self.current_num + self.increment
-
-class HtmlNode:
-    def __init__(self, tag_name, attributes=None, text=""):
-        self.tag_name: str = tag_name
-        if attributes is None:
-           self.attributes = []
-        else: 
-            self.attributes: list[tuple[str, str]] = attributes
-        self.text: str = text
-        self.children: list["HtmlNode"] = []
-    
-    def __str__(self):
-        return f'{self.tag_name}'
-
-class MyHTMLParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.stack: list[HtmlNode] = []
-        self.root_elems: list[HtmlNode] = []
-
-    def get_tree(self):
-        return self.root_elems
-
-    def current_elem(self):
-        size = len(self.stack)
-        if size < 1:
-            return None
-        else:
-            return self.stack[size-1]
-
-    def handle_starttag(self, tag, attrs):
-        node = HtmlNode(tag)
-
-        for attr in attrs:
-            node.attributes.append(attr)
-
-        current_elem = self.current_elem()
-        if current_elem:
-            current_elem.children.append(node)
-        else:
-            self.root_elems.append(node)
-
-        self.stack.append(node)
-
-    def handle_endtag(self, tag):
-        if self.current_elem().tag_name != tag:
-            print("HTML Parse Error!")
-            exit(-1)
-        
-        self.stack.pop()
-
-    def handle_data(self, data):
-        if not data.isspace():
-            self.current_elem().text = data
 
 class JsBuilder:
     def __init__(self, name):
@@ -105,12 +51,14 @@ class JsBuilder:
                 self.statements.append(statement)
     
     def apply_data(self, elem_index, data):
-        statement = f'{self.elems_arr_name}[{elem_index}].innerText="{data}";'
+        statement = f'{self.elems_arr_name}[{elem_index}].innerHTML="{data.replace("\n", "<br>")}";'
         self.statements.append(statement)
 
     def create_element(self, tag):
         self.statements.append(f'{self.elems_arr_name}.push(document.createElement("{tag}"));')
-        self.index_counter.increment_ticker()
+
+    def create_text_element(self, data):
+        self.statements.append(f'{self.elems_arr_name}.push(document.createTextNode("{data}"));')
 
     def append_element(self, parent_index, child_index):
         parent = f'{self.elems_arr_name}[{parent_index}]'
@@ -118,25 +66,31 @@ class JsBuilder:
         statement = f'{parent}.appendChild({child});'
         self.statements.append(statement)
 
-    def start_walk(self, tree):
+    def start_walk(self, tree): 
         self.create_element(tree.tag_name)
-        current_index = self.index_counter.get_current_num()-1
-        self.apply_attributes(current_index, tree.attributes)
-        if len(tree.text) > 0:
-            self.apply_data(current_index, tree.text)
+        self.apply_attributes(self.index_counter.get_current_num(), tree.attributes)
         for child in tree.children:
-            self.walk(child, current_index)
+            if child.type == "text":
+                self.create_text_element(child.text)
+                self.index_counter.increment_ticker()
+                self.append_element(0, self.index_counter.get_current_num())
+            else:
+                self.walk(child, 0)
 
     def walk(self, tree, parent_index):
-        current_index = self.index_counter.get_current_num() #must come before create_element!!
         self.create_element(tree.tag_name)
-        self.apply_attributes(current_index, tree.attributes)
-        if len(tree.text) > 0:
-            self.apply_data(current_index, tree.text)
-        self.append_element(parent_index, current_index)
+        self.index_counter.increment_ticker()
+        self.apply_attributes(self.index_counter.get_current_num(), tree.attributes)
+        self.append_element(parent_index, self.index_counter.get_current_num())
 
         for child in tree.children:
-            self.walk(child, current_index)
+            if child.type == "text":
+                new_parent = self.index_counter.get_current_num()
+                self.create_text_element(child.text)
+                self.index_counter.increment_ticker()
+                self.append_element(new_parent, self.index_counter.get_current_num())
+            else:
+                self.walk(child, self.index_counter.get_current_num())
 
     def get_pretty_str(self):
         output = ''
@@ -165,7 +119,7 @@ class JsBuilder:
         return output
 
 def tree_from_html(html):
-    parser = MyHTMLParser()
+    parser = HtmlToTree()
     parser.feed(html)
     tree = parser.get_tree()
     return tree
