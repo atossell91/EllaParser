@@ -130,8 +130,8 @@ def process(file_path, output_dir):
 
     builder = JsBuilder(name)
     builder.start_walk(tree[0])
-    #output = builder.get_ugly_str()
-    output = builder.get_pretty_str()
+    output = builder.get_ugly_str()
+    #output = builder.get_pretty_str()
 
     outpath = path.join(output_dir, f'{name}.js')
     with open(outpath, 'w') as file:
