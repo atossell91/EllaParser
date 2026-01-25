@@ -47,7 +47,10 @@ class JsBuilder:
                 statement = f'{self.map_name}.set("{key}",{self.elems_arr_name}[{elem_index}]);'
                 self.statements.append(statement)
             else:
-                statement = f'{self.elems_arr_name}[{elem_index}].setAttribute("{name}","{value}");'
+                if not value:
+                    statement = f'{self.elems_arr_name}[{elem_index}].{name}=true;'
+                else:
+                    statement = f'{self.elems_arr_name}[{elem_index}].setAttribute("{name}","{value}");'
                 self.statements.append(statement)
     
     def apply_data(self, elem_index, data):
