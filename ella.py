@@ -70,29 +70,25 @@ class JsBuilder:
         self.create_element(tree.tag_name)
         self.apply_attributes(self.index_counter.get_current_num(), tree.attributes)
         for child in tree.children:
-            if child.type == "text":
-                self.create_text_element(child.text)
-                self.index_counter.increment_ticker()
-                self.append_element(0, self.index_counter.get_current_num())
-            else:
-                self.walk(child, 0)
+            self.walk(child, 0)
 
     def walk(self, tree, parent_index):
-        self.create_element(tree.tag_name)
-        self.index_counter.increment_ticker()
-        self.apply_attributes(self.index_counter.get_current_num(), tree.attributes)
-        self.append_element(parent_index, self.index_counter.get_current_num())
+        if tree.type == "text":
+            self.create_text_element(tree.text)
+            self.index_counter.increment_ticker()
+            self.append_element(parent_index, self.index_counter.get_current_num())
+        else:
+            self.create_element(tree.tag_name)
+            self.index_counter.increment_ticker()
+            current_level = self.index_counter.get_current_num()
+            self.apply_attributes(self.index_counter.get_current_num(), tree.attributes)
+            self.append_element(parent_index, self.index_counter.get_current_num())
 
-        for child in tree.children:
-            if child.type == "text":
-                new_parent = self.index_counter.get_current_num()
-                self.create_text_element(child.text)
-                self.index_counter.increment_ticker()
-                self.append_element(new_parent, self.index_counter.get_current_num())
-            else:
-                self.walk(child, self.index_counter.get_current_num())
+            for child in tree.children:
+                self.walk(child, current_level)
 
     def get_pretty_str(self):
+        ## TODO: Add indices to createElements in pretty mode
         output = ''
         for statement in self.initial_statements:
             output = output + statement + '\n'
@@ -134,7 +130,8 @@ def process(file_path, output_dir):
 
     builder = JsBuilder(name)
     builder.start_walk(tree[0])
-    output = builder.get_ugly_str()
+    #output = builder.get_ugly_str()
+    output = builder.get_pretty_str()
 
     outpath = path.join(output_dir, f'{name}.js')
     with open(outpath, 'w') as file:
