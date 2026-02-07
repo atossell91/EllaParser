@@ -140,15 +140,47 @@ def process(file_path, output_dir):
     with open(outpath, 'w') as file:
         file.write(output)
 
-def process_multiple(files, output_dir):
+def process_multiple(files):
     for file in files:
-        process(file, output_dir)
+        process(file[0], file[1])
+
+def handle_build_conf(build_obj):
+    out_name = "out_dir"
+    in_name = "source_files"
+
+    files = []
+
+    if out_name in build_obj:
+        default_out = build_obj[out_name]
+    else:
+        default_out = "."
+
+    for item in build_obj[in_name]:
+        #input = None
+        #output = default_out
+        if type(item) is list and len(item) > 1:
+            input = item[0]
+            output = item[1]
+        elif type(item) is list and len(item) == 1:
+            input = item[0]
+            output = default_out
+        elif type(item) is str:
+            input = item
+            output = default_out
+        else:
+            print(f"PARSE ERROR: {item}")
+            exit(1)
+
+        files.append([input, output])
+    
+    return files
 
 def main():
     conf_path = "./build.json"
     with open(conf_path,'r') as f:
         conf = json.load(f)
-    process_multiple(conf["source_files"], conf["out_dir"])
+        build_items = handle_build_conf(conf)
+    process_multiple(build_items)
 
 if __name__ == '__main__':
     main()
