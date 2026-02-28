@@ -1,5 +1,6 @@
 from html.parser import HTMLParser
 from HtmlNodes import HtmlNode, HtmlTextNode
+from HtmlUtils import self_closers
 
 class HtmlToTree(HTMLParser):
     def __init__(self):
@@ -32,17 +33,29 @@ class HtmlToTree(HTMLParser):
         else:
             self.root_elems.append(node)
 
-        self.stack.append(node)
+        if (node.type == "element" and node.tag_name not in self_closers) or node.type == "text":
+            self.stack.append(node)
 
     def handle_endtag(self, tag):
         if self.current_elem().tag_name != tag:
-            print("HTML Parse Error!")
+            print(f"HTML Parse Error! {self.current_elem().tag_name} != {tag}")
             exit(-1)
         
         self.stack.pop()
 
+    def handle_startendtag(self, tag, attrs):
+        node = HtmlNode(tag)
+
+        for attr in attrs:
+            node.attributes.append(attr)
+
+        current_elem = self.current_elem()
+        if current_elem:
+            current_elem.children.append(node)
+        else:
+            self.root_elems.append(node)
+
     def handle_data(self, data):
         if not data.isspace():
-            print(f'Data is {data}')
             textNode = HtmlTextNode(data.strip())
             self.current_elem().children.append(textNode)

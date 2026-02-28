@@ -1,3 +1,5 @@
+
+--- ella.py ---
 from os import path
 import json
 from HtmlToTree import HtmlNode, HtmlToTree
@@ -140,48 +142,121 @@ def process(file_path, output_dir):
     with open(outpath, 'w') as file:
         file.write(output)
 
-def process_multiple(files):
+def process_multiple(files, output_dir):
     for file in files:
-        print(f"Parsing file: {file[0]}")
-        process(file[0], file[1])
-
-def handle_build_conf(build_obj):
-    out_name = "out_dir"
-    in_name = "source_files"
-
-    files = []
-
-    if out_name in build_obj:
-        default_out = build_obj[out_name]
-    else:
-        default_out = "."
-
-    for item in build_obj[in_name]:
-        #input = None
-        #output = default_out
-        if type(item) is list and len(item) > 1:
-            input = item[0]
-            output = item[1]
-        elif type(item) is list and len(item) == 1:
-            input = item[0]
-            output = default_out
-        elif type(item) is str:
-            input = item
-            output = default_out
-        else:
-            print(f"PARSE ERROR: {item}")
-            exit(1)
-
-        files.append([input, output])
-    
-    return files
+        process(file, output_dir)
 
 def main():
     conf_path = "./build.json"
     with open(conf_path,'r') as f:
         conf = json.load(f)
-        build_items = handle_build_conf(conf)
-    process_multiple(build_items)
+    process_multiple(conf["source_files"], conf["out_dir"])
 
 if __name__ == '__main__':
     main()
+
+--- TreeToHTML.py ---
+from HtmlNodes import HtmlNode, HtmlTextNode
+
+self_closers = {
+    'area', 'base', 'br', 'col', 'embed', 'hr', 'img',
+    'input', 'link', 'meta', 'source', 'track', 'wbr'
+}
+
+def write(text, indent=0):
+    print(text)
+
+def attributes_to_string(attributes):
+    out_str = ""
+    for key, value in attributes:
+        out_str += f'{key}="{value}" '
+    return out_str.strip()
+
+def TreeToHtml(tree):
+    if isinstance(tree, HtmlTextNode):
+        write(tree.text)
+    else:
+        tag = tree.tag_name.lower()
+        attr_str = attributes_to_string(tree.attributes)
+
+        if tag in self_closers:
+            write(f'<{tag} {attr_str}>')  # HTML5 style; add "/" for XHTML if needed
+            return
+
+        write(f'<{tag} {attr_str}>')
+        for child in tree.children:
+            TreeToHtml(child)
+        write(f'</{tag}>')
+
+
+--- HtmlToTree.py ---
+from html.parser import HTMLParser
+from HtmlNodes import HtmlNode, HtmlTextNode
+
+class HtmlToTree(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.stack: list[HtmlNode] = []
+        self.root_elems: list[HtmlNode] = []
+
+    def generate_tree(self, html):
+        self.feed(html)
+
+    def get_tree(self):
+        return self.root_elems
+
+    def current_elem(self):
+        size = len(self.stack)
+        if size < 1:
+            return None
+        else:
+            return self.stack[size-1]
+
+    def handle_starttag(self, tag, attrs):
+        node = HtmlNode(tag)
+
+        for attr in attrs:
+            node.attributes.append(attr)
+
+        current_elem = self.current_elem()
+        if current_elem:
+            current_elem.children.append(node)
+        else:
+            self.root_elems.append(node)
+
+        self.stack.append(node)
+
+    def handle_endtag(self, tag):
+        if self.current_elem().tag_name != tag:
+            print("HTML Parse Error!")
+            exit(-1)
+        
+        self.stack.pop()
+
+    def handle_data(self, data):
+        if not data.isspace():
+            print(f'Data is {data}')
+            textNode = HtmlTextNode(data.strip())
+            self.current_elem().children.append(textNode)
+
+
+--- HtmlNodes.py ---
+class HtmlNode:
+    def __init__(self, tag_name, attributes=None, text=""):
+        self.type = "element"
+        self.tag_name: str = tag_name
+        if attributes is None:
+           self.attributes = []
+        else: 
+            self.attributes: list[tuple[str, str]] = attributes
+        self.children: list["HtmlNode"] = []
+    
+    def __str__(self):
+        return f'{self.tag_name}'
+    
+class HtmlTextNode:
+    def __init__(self, text=""):
+        self.type = "text"
+        self.text = text
+
+

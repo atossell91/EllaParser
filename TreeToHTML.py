@@ -1,9 +1,5 @@
 from HtmlNodes import HtmlNode, HtmlTextNode
-
-self_closers = {
-    'area', 'base', 'br', 'col', 'embed', 'hr', 'img',
-    'input', 'link', 'meta', 'source', 'track', 'wbr'
-}
+from HtmlUtils import self_closers
 
 def write(text, indent=0):
     print(text)
