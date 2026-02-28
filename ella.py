@@ -142,7 +142,7 @@ def process(file_path, output_dir):
 
 def process_multiple(files):
     for file in files:
-        print(f"Parsing file: {file[0]}")
+        print(f"Parsing file: {file[0   ]}")
         process(file[0], file[1])
 
 def handle_build_conf(build_obj):
