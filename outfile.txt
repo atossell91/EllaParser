@@ -1,0 +1,10 @@
+import { bbwView } from "./comp/bbwView.js"
+
+export class bbw {
+    #viewElement;
+
+    constructor() {
+        const viewRes = bbwView();
+        this.#viewElement = viewRes.elems
+    }
+}
