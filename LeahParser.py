@@ -2,6 +2,19 @@ from os import path
 import json
 from HtmlToTree import HtmlNode, HtmlToTree
 
+class ParseData:
+    def __init__(self):
+        self.js = None
+        self.css_links = []
+        self.elem_refs = []
+    
+    def __add__(self, other):
+        output = ParseData()
+        output.html = self.html + other.html
+        output.css_links = self.css_links.extend(other.css_links)
+        output.elem_refs = self.elem_refs.extend(other.elem_refs)
+        return output
+
 class TickerCounter:
     def __init__(self, start=0, increment = 1):
         self.current_num = start
@@ -33,17 +46,22 @@ class JsBuilder:
             f'export{{{self.component_name}}}'
         ]
         self.pretty_indent = "    "
+        self.elem_refs = []
+        self.css_links = []
 
     def is_id_attribute(self, name, value):
         return name == self.id_tag_name and value[0:len(self.id_tag_prefix)] == self.id_tag_prefix
 
     def apply_attributes(self, elem_index, attributes):
+
+        ## Should this be extracting the reference keys here? Seems a bit weird...
         for attribute in attributes:
             name = attribute[0]
             value = attribute[1]
 
             if self.is_id_attribute(name, value):
                 key = value[len(self.id_tag_prefix):]
+                self.elem_refs.append(key)
                 statement = f'{self.map_name}.set("{key}",{self.elems_arr_name}[{elem_index}]);'
                 self.statements.append(statement)
             else:
@@ -69,6 +87,7 @@ class JsBuilder:
         statement = f'{parent}.appendChild({child});'
         self.statements.append(statement)
 
+    ## Should the walk functions directly return the reference keys? A different pattern should be used
     def start_walk(self, tree): 
         self.create_element(tree.tag_name)
         self.apply_attributes(self.index_counter.get_current_num(), tree.attributes)
@@ -123,65 +142,39 @@ def tree_from_html(html):
     tree = parser.get_tree()
     return tree
 
-def process(file_path, output_dir):
-    file = path.split(file_path)[1]
-    name = file.split(".")[0]
-
-    with open(file_path, 'r') as file:
-        html = file.read(-1)
+def process_html(html, comp_name):
     tree = tree_from_html(html)
 
-    builder = JsBuilder(name)
-    builder.start_walk(tree[0])
-    output = builder.get_ugly_str()
+    builder = JsBuilder(comp_name)
+
+    # find any css links
+    css_links = []
+    start_index = 0
+    if tree[start_index].tag_name == 'head':
+        head_elem = tree[start_index]
+        for child in head_elem.children:
+            if child.tag_name == 'link':
+                for attribute in child.attributes:
+                    if attribute[0] == 'href':
+                        css_links.append(attribute[1])
+        
+        start_index = start_index+1
+
+    builder.start_walk(tree[start_index])
+
+    parseRes = ParseData()
+    parseRes.js = builder.get_ugly_str()
     #output = builder.get_pretty_str()
+    parseRes.css_links = css_links
+    parseRes.elem_refs = builder.elem_refs
 
-    outpath = path.join(output_dir, f'{name}.js')
-    with open(outpath, 'w') as file:
-        file.write(output)
-
-def process_multiple(files):
-    for file in files:
-        print(f"Parsing file: {file[0   ]}")
-        process(file[0], file[1])
-
-def handle_build_conf(build_obj):
-    out_name = "out_dir"
-    in_name = "source_files"
-
-    files = []
-
-    if out_name in build_obj:
-        default_out = build_obj[out_name]
-    else:
-        default_out = "."
-
-    for item in build_obj[in_name]:
-        #input = None
-        #output = default_out
-        if type(item) is list and len(item) > 1:
-            input = item[0]
-            output = item[1]
-        elif type(item) is list and len(item) == 1:
-            input = item[0]
-            output = default_out
-        elif type(item) is str:
-            input = item
-            output = default_out
-        else:
-            print(f"PARSE ERROR: {item}")
-            exit(1)
-
-        files.append([input, output])
-    
-    return files
+    return parseRes
 
 def main():
-    conf_path = "./build.json"
-    with open(conf_path,'r') as f:
-        conf = json.load(f)
-        build_items = handle_build_conf(conf)
-    process_multiple(build_items)
+    html = '<head>    <link rel="stylesheet" href="./kira.css"/></head><div class="kiraView">    <div>        <button data-name="id-clickyButton">Clicky</button>    </div>    <input type="text" data-name="id-happyText"/></div>'
+    res = process_html(html, "Kira")
+    print(res.js)
+    print(res.elem_refs)
 
 if __name__ == '__main__':
     main()

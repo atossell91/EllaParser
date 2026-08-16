@@ -5,6 +5,7 @@ import json
 
 import StreamReplacer
 import PathLoader
+import LeahParser
 
 SCRIPT_PATH = os.path.dirname(os.path.abspath(__file__))
 FILE_SRC_PATH = os.path.join(SCRIPT_PATH, "FileSamples")
@@ -57,6 +58,9 @@ def update_build_config(config_path, html_view_source, js_view_target):
     with open(config_path, 'w') as file:       
         json.dump(obj, file, indent=4)
 
+def webify_path(path):
+    return path.replace('{{webroot}}/', "./")
+
 def scaffold_new(diri, app_name):
     ## Load or create the paths ini file
     ini_path = os.path.join(diri, PathLoader.CONFIG_NAME)
@@ -70,17 +74,17 @@ def scaffold_new(diri, app_name):
         PathLoader.make_directory_tree(paths[label].CompletePath)
 
     ## Copy files to their appropriate diriectories
+    index_filename = 'index.html'
     app_js_filename = "app.js"
     app_class_name = "App"
     app_init_fname = "init.js"
-    app_init_path = os.path.join(diri, app_init_fname)
-    copy_file(FILE_SRC_PATH, "app.js", diri, app_js_filename, {"appName": app_class_name})
-    copy_file(FILE_SRC_PATH, "init.js", diri, "init.js", {
+    copy_file(FILE_SRC_PATH, "app.js", paths.boilerplate.CompletePath, app_js_filename, {"appName": app_class_name})
+    copy_file(FILE_SRC_PATH, "init.js", paths.boilerplate.CompletePath, app_init_fname, {
         "appName": app_class_name,
-        "appJsPath": os.path.join(diri, app_js_filename)
+        "appJsPath": os.path.join('./', app_js_filename)
     })
-    copy_file(FILE_SRC_PATH, "index.html", diri, "index.html",{
-        "initFilePath": app_init_path
+    copy_file(FILE_SRC_PATH, index_filename, paths.webroot.CompletePath, index_filename,{
+        "initFilePath": os.path.join(webify_path(paths.boilerplate.DataPath), app_init_fname)
     })
 
 def find_project_root(current_dir, max_hops = 5):
@@ -106,18 +110,51 @@ def create_new_component(current_dir, component_name):
     js_view_name = f'{view_name}.js'
     js_model_name = f'{component_name}.js'
 
-    copy_file(FILE_SRC_PATH, "ViewFile.html", paths[PathLoader.HTML_VIEWS_LABEL], html_view_name, {
+    copy_file(FILE_SRC_PATH, "ViewFile.html", paths.htmlviews.CompletePath, html_view_name, {
         "viewName": component_name
     })
 
-    copy_file(FILE_SRC_PATH, 'ModelFile.js', paths[PathLoader.MODELS_LABEL], js_model_name, {
+    copy_file(FILE_SRC_PATH, 'ModelFile.js', paths.models.CompletePath, js_model_name, {
         "viewName": view_name,
-        "viewPath": os.path.join(paths[PathLoader.COMPILED_VIEWS_LABEL], js_view_name)
+        "viewPath": os.path.join(paths.compiledviews.DataPath.replace('{{webroot}}', '..'), js_view_name)
     })
 
 def main():
-    scaffold_new(".", "leah")
-    #create_new_component(".", "Sayu")
+    top_parser = argparse.ArgumentParser("Leah")
+    
+    sub = top_parser.add_subparsers(dest='command_type')
+    sub1 = sub.add_parser("new")
+    sub1.add_argument("item_type", choices=['project', 'component'])
+    sub1.add_argument("name")
+    sub1.add_argument("-d", dest="directory", default='.')
+
+    sub2 = sub.add_parser("generate")
+    sub2.add_argument("generate_target", choices=['pathconfig'])
+
+    sub3 = sub.add_parser("build")
+    sub3.add_argument("-d", dest='directory', default='.')
+
+    res = top_parser.parse_args()
+    
+    if res.command_type == 'generate':
+        pass
+    elif res.command_type == 'new':
+        name = res.name
+        directory = res.directory
+        if res.item_type == 'component':
+            create_new_component(directory, name)
+        if res.item_type == 'project':
+            scaffold_new(directory, name)
+    elif res.command_type == 'build':
+        directory = res.directory
+        paths = PathLoader.load_paths(os.path.join(directory, PathLoader.CONFIG_NAME))
+        files = os.listdir(paths.htmlviews.CompletePath)
+        for file_path in files:
+            _, fname = os.path.split(file_path)
+            viewName = os.path.splitext(fname)[0:len('view')]
+            with open(os.path.join(paths.htmlviews.CompletePath, file_path), 'r') as file:        
+                html = file.read(-1)
+            LeahParser.process_html(html, viewName)
 
 if __name__ == '__main__':
     main()
