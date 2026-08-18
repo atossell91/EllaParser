@@ -19,13 +19,13 @@ class FilePaths:
     @staticmethod
     def get_default_paths():
         paths = FilePaths()
-        paths.add_path('Root', '.')
-        paths.add_path('WebRoot', '{{root}}/web')
-        paths.add_path('LocalRoot', '{{root}}/local')
-        paths.add_path('CompiledViews', '{{webroot}}/compiled-views')
-        paths.add_path('Models', '{{webroot}}/models')
-        paths.add_path('Boilerplate', '{{webroot}}/indexjs')
-        paths.add_path('HtmlViews', '{{localroot}}/html-views')
+        paths.add_path('root', '.')
+        paths.add_path('webroot', '{{root}}/web')
+        paths.add_path('localroot', '{{root}}/local')
+        paths.add_path('compiledviews', '{{webroot}}/compiled-views')
+        paths.add_path('models', '{{webroot}}/models')
+        paths.add_path('boilerplate', '{{webroot}}/indexjs')
+        paths.add_path('htmlviews', '{{localroot}}/html-views')
     
         return paths
 
@@ -34,6 +34,7 @@ class FilePaths:
 
     def add_path(self, label, data_path):
         complete = self.complete_path(data_path)
+
         self.paths[label] = FileItem(data_path, complete)
 
     def handle_label(self, label, args):
