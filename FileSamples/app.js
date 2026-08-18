@@ -1,3 +1,10 @@
+//import statements here!
+
 export class {{appName}} {
-    constructor() {}
+
+    root;
+
+    constructor() {
+        this.#root = document.getElementsByTagName("body")[0];
+    }
 }

@@ -36,18 +36,31 @@ class JsBuilder:
         self.id_tag_name = 'data-name'
         self.id_tag_prefix = "id-"
         self.map_name = "map"
-        self.initial_statements = [
-            f'function {self.component_name}(){{',
-            f'const {self.elems_arr_name}=[];',
-            f'const {self.map_name}=new Map();'
-        ]
-        self.final_statements = [
-            f'return{{elems:{self.elems_arr_name}[0],refs:{self.map_name}}}}}',
-            f'export{{{self.component_name}}}'
-        ]
         self.pretty_indent = "    "
         self.elem_refs = []
         self.css_links = []
+
+    def create_initial_statements(self):
+        statements = []
+        statements.append(f'export class {self.component_name}View {{')
+        for ref in self.elem_refs:
+            statements.append(f'#{ref};')
+        statements.append(f'constructor(){{')
+        statements.append(f'const {self.elems_arr_name}=[];')
+        return statements
+    
+    def create_final_statements(self):
+        statements = []
+        #statements.append(f'return{{elems:{self.elems_arr_name}[0],refs:{self.map_name}}}}}')
+        statements.append(f'}}')
+
+        for ref in self.elem_refs:
+            camel_name = ref[0].upper() + ref[1:len(ref)]
+            statements.append(f'get ref{camel_name}(){{return this.#{ref};}}')
+
+        statements.append(f'}}')
+        #statements.append(f'export{{{self.component_name}}};')
+        return statements
 
     def is_id_attribute(self, name, value):
         return name == self.id_tag_name and value[0:len(self.id_tag_prefix)] == self.id_tag_prefix
@@ -62,7 +75,8 @@ class JsBuilder:
             if self.is_id_attribute(name, value):
                 key = value[len(self.id_tag_prefix):]
                 self.elem_refs.append(key)
-                statement = f'{self.map_name}.set("{key}",{self.elems_arr_name}[{elem_index}]);'
+                statement = f'this.#{key}={self.elems_arr_name}[{elem_index}];'
+                # statement = f'{self.map_name}.set("{key}",{self.elems_arr_name}[{elem_index}]);'
                 self.statements.append(statement)
             else:
                 if not value:
@@ -111,27 +125,31 @@ class JsBuilder:
 
     def get_pretty_str(self):
         ## TODO: Add indices to createElements in pretty mode
+        initial_statements = self.create_initial_statements()
+        final_statements = self.create_final_statements()
         output = ''
-        for statement in self.initial_statements:
+        for statement in initial_statements:
             output = output + statement + '\n'
 
         for statement in self.statements:
             output = output + self.pretty_indent + statement + '\n'
 
-        for statement in self.final_statements:
+        for statement in final_statements:
             output = output + statement + '\n'
         
         return output
 
     def get_ugly_str(self):
         output = ''
-        for statement in self.initial_statements:
+        initial_statements = self.create_initial_statements()
+        final_statements = self.create_final_statements()
+        for statement in initial_statements:
             output = output + statement
 
         for statement in self.statements:
             output = output + statement
 
-        for statement in self.final_statements:
+        for statement in final_statements:
             output = output + statement
         
         return output
@@ -171,10 +189,10 @@ def process_html(html, comp_name):
     return parseRes
 
 def main():
-    html = '<head>    <link rel="stylesheet" href="./kira.css"/></head><div class="kiraView">    <div>        <button data-name="id-clickyButton">Clicky</button>    </div>    <input type="text" data-name="id-happyText"/></div>'
+    html = '<head>    <link rel="stylesheet" href="./kira.css"/></head><div class="kiraView" data-name="id-root">    <div>        <button data-name="id-clickyButton">Clicky</button>    </div>    <input type="text" data-name="id-happyText"/></div>'
     res = process_html(html, "Kira")
     print(res.js)
-    print(res.elem_refs)
 
 if __name__ == '__main__':
     main()
+    

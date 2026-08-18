@@ -1,10 +1,13 @@
 import { {{viewName}} } from "{{viewPath}}"
 
 export class {{modelName}} {
-    #viewElement;
+    #view;
 
     constructor() {
-        const viewRes = {{viewName}}();
-        this.#viewElement = viewRes.elems
+        this.#view = new {{viewName}}();
+    }
+
+    get viewRoot() {
+        return this.#view.refRoot;
     }
 }

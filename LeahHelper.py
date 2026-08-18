@@ -116,7 +116,8 @@ def create_new_component(current_dir, component_name):
 
     copy_file(FILE_SRC_PATH, 'ModelFile.js', paths.models.CompletePath, js_model_name, {
         "viewName": view_name,
-        "viewPath": os.path.join(paths.compiledviews.DataPath.replace('{{webroot}}', '..'), js_view_name)
+        "viewPath": os.path.join(paths.compiledviews.DataPath.replace('{{webroot}}', '..'), js_view_name),
+        "modelName": component_name
     })
 
 def main():
@@ -150,11 +151,18 @@ def main():
         paths = PathLoader.load_paths(os.path.join(directory, PathLoader.CONFIG_NAME))
         files = os.listdir(paths.htmlviews.CompletePath)
         for file_path in files:
+            print(file_path)
             _, fname = os.path.split(file_path)
-            viewName = os.path.splitext(fname)[0:len('view')]
+            prefix, suffix = os.path.splitext(fname)
+            view_name = prefix[0:-len('view')]
+            print(view_name)
             with open(os.path.join(paths.htmlviews.CompletePath, file_path), 'r') as file:        
                 html = file.read(-1)
-            LeahParser.process_html(html, viewName)
+            res = LeahParser.process_html(html, view_name)
+
+            output_path = os.path.join(paths.compiledviews.CompletePath, f'{view_name}View.js')
+            with open(output_path, 'w') as file:
+                file.write(res.js)
 
 if __name__ == '__main__':
     main()
