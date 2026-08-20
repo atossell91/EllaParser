@@ -26,6 +26,7 @@ class FilePaths:
         paths.add_path('models', '{{webroot}}/models')
         paths.add_path('boilerplate', '{{webroot}}/indexjs')
         paths.add_path('htmlviews', '{{localroot}}/html-views')
+        paths.add_path('services', '{{webroot}}/services')
     
         return paths
 

@@ -2,7 +2,7 @@
 
 export class {{appName}} {
 
-    root;
+    #root;
 
     constructor() {
         this.#root = document.getElementsByTagName("body")[0];

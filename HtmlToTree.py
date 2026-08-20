@@ -56,6 +56,9 @@ class HtmlToTree(HTMLParser):
             self.root_elems.append(node)
 
     def handle_data(self, data):
-        if not data.isspace():
-            textNode = HtmlTextNode(data.strip())
-            self.current_elem().children.append(textNode)
+        try:
+            if not data.isspace():
+                textNode = HtmlTextNode(data.strip())
+                self.current_elem().children.append(textNode)
+        except:
+            print('Error at: ', self.getpos())
